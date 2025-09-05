@@ -1,0 +1,12 @@
+# Archivos de Visual Studio
+.vs/
+*.user
+*.suo
+*.vsidx
+*.vscode/
+
+# Binarios y compilados
+bin/
+obj/
+Debug/
+Release/

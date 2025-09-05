@@ -1,0 +1,18 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+namespace Inventory.Core.Entities;
+
+public class Material
+{
+    public int IdMaterials { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string ShortName { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public int MaterialCategoryId { get; set; }
+
+    public virtual MaterialCategory MaterialCategory { get; set; } = null!;
+}
