@@ -1,0 +1,51 @@
+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
+
+🔹 1. Inicializar el repositorio local
+git init
+git branch -M main
+git remote add origin https://github.com/JoseJuanCalderonSotero02/SSOGenerico.git
+
+🔹 2. Ignorar archivos innecesarios de Visual Studio
+
+Crea un archivo .gitignore en la raíz de tu proyecto con algo como esto:
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.vsidx
+*.vscode/
+
+# Compilados
+bin/
+obj/
+Debug/
+Release/
+
+
+Después dile a Git que “olvide” los archivos que ya había intentado rastrear:
+
+git rm -r --cached .vs
+git rm -r --cached bin
+git rm -r --cached obj
+
+🔹 3. Preparar el primer commit
+git add .
+git commit -m "Primer commit del proyecto"
+
+🔹 4. Resolver conflicto con lo que ya había en GitHub
+
+👉 Si el repo en GitHub está vacío usa:
+
+git push -u origin main
+
+
+👉 Si GitHub ya tenía un README o .gitignore creado desde la web, primero sincroniza:
+
+git pull origin main --rebase
+git push origin main
+
+
+👉 Si quieres sobrescribir todo lo que haya en GitHub con tu código local:
+
+git push origin main --force

@@ -66,6 +66,7 @@ public class InventoryService : IInventoryService
     {
         var requisition = await _context.Requisitions
             .Include(r => r.MaterialRequisitions)
+            .ThenInclude(mr => mr.MaterialMeasurementUnit) // ← ¡ESTA LÍNEA FALTABA!
             .FirstOrDefaultAsync(r => r.IdRequisitions == requisitionId);
 
         if (requisition == null)
@@ -73,12 +74,13 @@ public class InventoryService : IInventoryService
             throw new Exception($"Requisición con ID {requisitionId} no encontrada");
         }
 
+        // El resto de tu código permanece igual...
         var purchaseOrder = new PurchaseOrder
         {
             SuppliersId = supplierId,
             RequisitionId = requisitionId,
             BranchId = requisition.BranchId,
-            StatusId = 6, // Pendiente (según los statuses seedeados)
+            StatusId = 6, // Pendiente
             InsertDate = DateTime.UtcNow,
             UserId = userId
         };
@@ -108,8 +110,7 @@ public class InventoryService : IInventoryService
             }
         }
 
-        // Cambiar estado de la requisición a "En Proceso"
-        requisition.StatusId = 4; // En Proceso
+        requisition.StatusId = 4; 
         await _context.SaveChangesAsync();
 
         return purchaseOrder.IdPurchaseOrders;
@@ -126,6 +127,15 @@ public class InventoryService : IInventoryService
             throw new Exception($"Orden de compra con ID {purchaseOrderId} no encontrada");
         }
 
+        // OBTENER EL ID CORRECTO dinámicamente
+        var entradaMovement = await _context.TypeMovementInventories
+            .FirstOrDefaultAsync(t => t.Name == "Entrada");
+
+        if (entradaMovement == null)
+        {
+            throw new Exception("No se encontró el tipo de movimiento 'Entrada' en el sistema");
+        }
+
         foreach (var receivedMaterial in receivedMaterials)
         {
             var materialPO = await _context.MaterialPurchaseOrders
@@ -135,10 +145,10 @@ public class InventoryService : IInventoryService
             {
                 materialPO.QuantityIn += receivedMaterial.QuantityReceived;
 
-                // Registrar movimiento de inventario
+                // Registrar movimiento de inventario - USAR ID DINÁMICO
                 var movement = new MovementInventory
                 {
-                    TypeMovementsInventoryId = 1, // Entrada
+                    TypeMovementsInventoryId = entradaMovement.IdTypeMovementsInventory, // ← ID CORRECTO
                     BranchId = purchaseOrder.BranchId,
                     MaterialSupplierId = materialPO.MaterialSupplierId,
                     MaterialMeasurementUnitId = materialPO.MaterialMeasurementUnitId,

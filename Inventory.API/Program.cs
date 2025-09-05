@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Text.Json;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -66,6 +67,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IModuleService, ModuleService>();
 
 // Configure JWT Authentication
 var jwtKey = builder.Configuration.GetSection("Jwt:Key").Value;

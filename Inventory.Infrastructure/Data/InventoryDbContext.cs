@@ -1,5 +1,10 @@
 ﻿using Inventory.Core.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection;
+using System.Security;
+using Module = Inventory.Core.Entities.Module; 
+using Permission = Inventory.Core.Entities.Permission; 
+using RolePermission = Inventory.Core.Entities.RolePermission; 
 
 namespace Inventory.Infrastructure.Data;
 
@@ -12,13 +17,17 @@ public class InventoryDbContext : DbContext
     public DbSet<Role> Roles { get; set; }
     public DbSet<UserRole> UserRoles { get; set; }
 
+    public DbSet<Module> Modules { get; set; }
+    public DbSet<Permission> Permissions { get; set; }
+    public DbSet<RolePermission> RolePermissions { get; set; }
+
     // Inventory Tables
     public DbSet<MaterialCategory> MaterialCategories { get; set; }
     public DbSet<MeasurementUnit> MeasurementUnits { get; set; }
     public DbSet<Supplier> Suppliers { get; set; }
     public DbSet<Branch> Branches { get; set; }
     public DbSet<Material> Materials { get; set; }
-    public DbSet<MaterialsMeasurementUnits> MaterialsMeasurementUnits { get; set; } // ← CON "s"
+    public DbSet<MaterialsMeasurementUnits> MaterialsMeasurementUnits { get; set; }
     public DbSet<MaterialSupplier> MaterialSuppliers { get; set; }
     public DbSet<Status> Statuses { get; set; }
     public DbSet<Requisition> Requisitions { get; set; }
@@ -32,13 +41,28 @@ public class InventoryDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Configurar esquemas
-        modelBuilder.HasDefaultSchema("inv");
-
-        // Esquema SSO
+        // Configurar esquemas y nombres de tabla EXACTOS
         modelBuilder.Entity<User>().ToTable("Users", "sso");
         modelBuilder.Entity<Role>().ToTable("Roles", "sso");
         modelBuilder.Entity<UserRole>().ToTable("UserRoles", "sso");
+
+        // Inventory Tables - NOMBRES EXACTOS
+        modelBuilder.Entity<MaterialCategory>().ToTable("MaterialCategory", "inv");
+        modelBuilder.Entity<MeasurementUnit>().ToTable("MeasurementUnits", "inv");
+        modelBuilder.Entity<Supplier>().ToTable("Suppliers", "inv");
+        modelBuilder.Entity<Branch>().ToTable("Branches", "inv");
+        modelBuilder.Entity<Material>().ToTable("Materials", "inv");
+        modelBuilder.Entity<MaterialsMeasurementUnits>().ToTable("MaterialsMeasurementUnits", "inv");
+        modelBuilder.Entity<MaterialSupplier>().ToTable("MaterialsSupplier", "inv");
+        modelBuilder.Entity<Status>().ToTable("Statuses", "inv");
+        modelBuilder.Entity<Requisition>().ToTable("Requisitions", "inv");
+        modelBuilder.Entity<MaterialRequisition>().ToTable("MaterialRequisition", "inv");
+        modelBuilder.Entity<PurchaseOrder>().ToTable("PurchaseOrders", "inv");
+        modelBuilder.Entity<MaterialPurchaseOrder>().ToTable("MaterialsPurchaseOrders", "inv");
+        modelBuilder.Entity<InvoicePurchaseOrder>().ToTable("InvoicePurchaseOrders", "inv");
+        modelBuilder.Entity<TypeMovementInventory>().ToTable("TypeMovementsInventory", "inv");
+        modelBuilder.Entity<MovementInventory>().ToTable("MovementsInventory", "inv");
+        modelBuilder.Entity<InventoryByBranch>().ToTable("InventoryByBranch", "inv");
 
         // Configuración de User
         modelBuilder.Entity<User>(entity =>
@@ -79,6 +103,58 @@ public class InventoryDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(ur => ur.AssignedByIdUsers)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Module>(entity =>
+        {
+            entity.ToTable("Modules", "sso");
+            entity.HasKey(e => e.IdModule);
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(255);
+            entity.Property(e => e.Route).HasMaxLength(200);
+            entity.Property(e => e.Icon).HasMaxLength(50);
+
+            // Self-referencing relationship for parent/child modules
+            entity.HasOne(m => m.ParentModule)
+                .WithMany(m => m.ChildModules)
+                .HasForeignKey(m => m.ParentModuleId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Configuración de Permission
+        modelBuilder.Entity<Permission>(entity =>
+        {
+            entity.ToTable("Permissions", "sso");
+            entity.HasKey(e => e.IdPermission);
+            entity.Property(e => e.Name).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Code).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(255);
+
+            entity.HasIndex(e => e.Code).IsUnique();
+
+            entity.HasOne(p => p.Module)
+                .WithMany(m => m.Permissions)
+                .HasForeignKey(p => p.ModuleId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configuración de RolePermission
+        modelBuilder.Entity<RolePermission>(entity =>
+        {
+            entity.ToTable("RolePermissions", "sso");
+            entity.HasKey(e => e.IdRolePermission);
+
+            entity.HasIndex(e => new { e.RoleId, e.PermissionId }).IsUnique();
+
+            entity.HasOne(rp => rp.Role)
+                .WithMany(r => r.RolePermissions)
+                .HasForeignKey(rp => rp.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(rp => rp.Permission)
+                .WithMany(p => p.RolePermissions)
+                .HasForeignKey(rp => rp.PermissionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Configuración de MaterialCategory
@@ -132,7 +208,7 @@ public class InventoryDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // Configuración de MaterialsMeasurementUnits (CON "s")
+        // Configuración de MaterialsMeasurementUnits
         modelBuilder.Entity<MaterialsMeasurementUnits>(entity =>
         {
             entity.HasKey(e => e.IdMaterialsMeasurementUnits);
@@ -211,7 +287,6 @@ public class InventoryDbContext : DbContext
         // Configuración de MaterialRequisition
         modelBuilder.Entity<MaterialRequisition>(entity =>
         {
-            entity.ToTable("MaterialRequisition", "inv");
             entity.HasKey(e => e.IdMaterialRequisition);
             entity.HasIndex(e => new { e.RequisitionId, e.MaterialMeasurementUnitId }).IsUnique();
             entity.Property(e => e.Quantity).HasColumnType("decimal(18,2)");
@@ -221,9 +296,9 @@ public class InventoryDbContext : DbContext
                 .HasForeignKey(mr => mr.RequisitionId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(mr => mr.MaterialMeasurementUnit) // ← CORREGIDO: propiedad de navegación
+            entity.HasOne(mr => mr.MaterialMeasurementUnit)
                 .WithMany()
-                .HasForeignKey(mr => mr.MaterialMeasurementUnitId) // ← FK SIN "s"
+                .HasForeignKey(mr => mr.MaterialMeasurementUnitId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -277,9 +352,9 @@ public class InventoryDbContext : DbContext
                 .HasForeignKey(mpo => mpo.MaterialSupplierId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasOne(mpo => mpo.MaterialMeasurementUnit) // ← CORREGIDO: propiedad de navegación
+            entity.HasOne(mpo => mpo.MaterialMeasurementUnit)
                 .WithMany()
-                .HasForeignKey(mpo => mpo.MaterialMeasurementUnitId) // ← FK SIN "s"
+                .HasForeignKey(mpo => mpo.MaterialMeasurementUnitId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -326,9 +401,9 @@ public class InventoryDbContext : DbContext
                 .HasForeignKey(mi => mi.MaterialSupplierId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasOne(mi => mi.MaterialMeasurementUnit) // ← CORREGIDO: propiedad de navegación
+            entity.HasOne(mi => mi.MaterialMeasurementUnit)
                 .WithMany()
-                .HasForeignKey(mi => mi.MaterialMeasurementUnitId) 
+                .HasForeignKey(mi => mi.MaterialMeasurementUnitId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(mi => mi.User)
@@ -355,11 +430,14 @@ public class InventoryDbContext : DbContext
                 .HasForeignKey(ib => ib.MaterialSupplierId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(ib => ib.MaterialMeasurementUnit) // ← CORREGIDO: propiedad de navegación
+            entity.HasOne(ib => ib.MaterialMeasurementUnit)
                 .WithMany()
-                .HasForeignKey(ib => ib.MaterialMeasurementUnitId) // ← FK SIN "s"
+                .HasForeignKey(ib => ib.MaterialMeasurementUnitId)
                 .OnDelete(DeleteBehavior.Cascade);
-        });
+        }
+
+
+        );
 
         base.OnModelCreating(modelBuilder);
     }
